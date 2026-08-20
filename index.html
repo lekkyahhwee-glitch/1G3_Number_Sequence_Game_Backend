@@ -62,15 +62,6 @@
 <div class="sub">Live class tracker · auto-refreshes every 5 seconds</div>
 
 <div class="panel">
-  <h2>Backend connection</h2>
-  <label>Apps Script Web App URL</label>
-  <div class="row">
-    <input type="text" id="backendUrl" placeholder="https://script.google.com/macros/s/AKfycbyH1VgE4IFPf5lAbebtdlid4zQIpOG0a39uaR-mzVPKky434xJEgDK94LCe1gigv-5DdA/exec">
-    <button class="primary" id="saveBackend">Save</button>
-  </div>
-</div>
-
-<div class="panel">
   <h2>Session</h2>
   <div class="row" style="align-items:center;">
     <div>
@@ -88,6 +79,7 @@
 </div>
 
 <div class="panel">
+
   <h2>Live Class Tracker</h2>
   <table>
     <thead><tr><th>Student</th><th>Score</th><th>Attempts logged</th><th>Status</th></tr></thead>
@@ -101,6 +93,12 @@
     <button class="danger" id="clearSessionBtn">Clear This Session</button>
   </div>
   <div id="manageLog"><div class="empty-state">No entries yet.</div></div>
+</div>
+
+<div class="panel">
+  <h2>Unassigned Attempts</h2>
+  <p style="font-family:var(--font-mono); font-size:0.78rem; opacity:0.6; margin-bottom:0.8rem;">Students who played without entering a session code — their results are still recorded, just not tied to any session. Check here if someone's missing above.</p>
+  <div id="unassignedLog"><div class="empty-state">None found.</div></div>
 </div>
 
 <div class="modal-backdrop" id="clearModal">
@@ -117,19 +115,16 @@
 </div>
 
 <script>
-  let backendUrl = localStorage.getItem('numseq-teacher-backend') || '';
+  // Paste your deployed Google Apps Script Web App URL below — same one used in
+  // number-sequences-game.html. Leave as-is and the dashboard just won't have data to show.
+  const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbyH1VgE4IFPf5lAbebtdlid4zQIpOG0a39uaR-mzVPKky434xJEgDK94LCe1gigv-5DdA/exec';
+
   let sessionCode = localStorage.getItem('numseq-teacher-session') || '';
   let latestData = [];
+  let unassignedData = [];
   const expandedStudents = new Set();
 
-  document.getElementById('backendUrl').value = backendUrl;
   document.getElementById('sessionCodeDisplay').textContent = sessionCode || '------';
-
-  document.getElementById('saveBackend').addEventListener('click', ()=>{
-    backendUrl = document.getElementById('backendUrl').value.trim();
-    localStorage.setItem('numseq-teacher-backend', backendUrl);
-    poll();
-  });
 
   document.getElementById('newSessionBtn').addEventListener('click', ()=>{
     sessionCode = String(Math.floor(100000 + Math.random()*900000));
@@ -139,12 +134,23 @@
     poll();
   });
 
+  function backendReady(){
+    return BACKEND_URL && BACKEND_URL.indexOf('PASTE_') !== 0;
+  }
+
   async function poll(){
-    if(!backendUrl || !sessionCode) return;
+    if(!backendReady() || !sessionCode) return;
     try{
-      const res = await fetch(backendUrl + '?action=fetch&session=' + encodeURIComponent(sessionCode));
+      const res = await fetch(BACKEND_URL + '?action=fetch&session=' + encodeURIComponent(sessionCode));
       const json = await res.json();
       if(json.ok){ latestData = json.data; render(); }
+    }catch(e){ /* silent — will retry on next poll */ }
+    try{
+      // Fetch everything (no session filter) so we can spot attempts logged with a blank session code —
+      // these belong to students who played without entering a code, and would otherwise be invisible above.
+      const res2 = await fetch(BACKEND_URL + '?action=fetch');
+      const json2 = await res2.json();
+      if(json2.ok){ unassignedData = json2.data.filter(r => !r.sessionCode); renderUnassigned(); }
     }catch(e){ /* silent — will retry on next poll */ }
   }
 
@@ -247,10 +253,21 @@
       btn.addEventListener('click', async (e)=>{
         e.stopPropagation();
         const rowIndex = btn.dataset.deleteRow;
-        try{ await fetch(backendUrl + '?action=delete&rowIndex=' + rowIndex); }catch(err){}
+        try{ await fetch(BACKEND_URL + '?action=delete&rowIndex=' + rowIndex); }catch(err){}
         poll();
       });
     });
+  }
+
+  function renderUnassigned(){
+    const el = document.getElementById('unassignedLog');
+    if(unassignedData.length === 0){ el.innerHTML = '<div class="empty-state">None found.</div>'; return; }
+    const groups = groupByStudent(unassignedData);
+    el.innerHTML = Object.keys(groups).sort().map(name=>{
+      const rows = groups[name];
+      const correctCount = rows.filter(r=>r.correct === 'Correct').length;
+      return `<div class="attempt-row"><span>${name} — ${rows.length} attempts, ${correctCount} correct</span></div>`;
+    }).join('');
   }
 
   function render(){
@@ -272,7 +289,7 @@
     document.getElementById('clearConfirmBtn').disabled = e.target.value !== 'CLEAR';
   });
   document.getElementById('clearConfirmBtn').addEventListener('click', async ()=>{
-    try{ await fetch(backendUrl + '?action=clearSession&session=' + encodeURIComponent(sessionCode)); }catch(e){}
+    try{ await fetch(BACKEND_URL + '?action=clearSession&session=' + encodeURIComponent(sessionCode)); }catch(e){}
     clearModal.classList.remove('open');
     poll();
   });
