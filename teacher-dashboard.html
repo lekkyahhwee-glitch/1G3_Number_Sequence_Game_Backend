@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Founder's Day Mystery · Teacher Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#15172B; --paper:#FBF8F1; --paper-dim:#F1ECE0; --line:rgba(21,23,43,0.12);
+    --coral:#FF6552; --mint:#15B294; --gold:#E8A800; --red:#D64545; --amber:#DFA000; --green:#1FA36B;
+    --font-display:'Space Grotesk', sans-serif; --font-body:'Inter', sans-serif; --font-mono:'JetBrains Mono', monospace;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{ font-family:var(--font-body); background:var(--paper); color:var(--ink); padding:2rem clamp(1rem,4vw,3rem); }
+  h1{ font-family:var(--font-display); font-size:clamp(1.5rem,3vw,2.1rem); margin-bottom:0.3rem; }
+  .sub{ font-family:var(--font-mono); font-size:0.8rem; opacity:0.6; margin-bottom:1.6rem; }
+  .panel{ background:#fff; border:1px solid var(--line); border-radius:14px; padding:1.4rem 1.6rem; margin-bottom:1.6rem; }
+  .panel h2{ font-family:var(--font-display); font-size:1.15rem; margin-bottom:0.9rem; }
+  label{ font-family:var(--font-mono); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.05em; opacity:0.6; display:block; margin-bottom:0.3rem; }
+  input[type=text]{ font-family:var(--font-mono); font-size:0.95rem; padding:0.6rem 0.8rem; border-radius:8px; border:1px solid var(--line); width:100%; max-width:320px; }
+  button{ font-family:var(--font-mono); font-size:0.82rem; font-weight:600; border-radius:20px; padding:0.55rem 1.1rem; cursor:pointer; border:1px solid var(--line); background:var(--paper-dim); color:var(--ink); }
+  button.primary{ background:var(--ink); color:#fff; border-color:var(--ink); }
+  button.danger{ background:var(--red); color:#fff; border-color:var(--red); }
+  .row{ display:flex; gap:0.8rem; flex-wrap:wrap; align-items:flex-end; }
+  .session-code-display{ font-family:var(--font-mono); font-weight:700; font-size:2.4rem; letter-spacing:0.1em; background:var(--paper-dim); border-radius:10px; padding:0.6rem 1.2rem; display:inline-block; }
+
+  .skill-row{ display:flex; align-items:center; gap:1rem; padding:0.7rem 0; border-bottom:1px solid var(--line); }
+  .skill-row:last-child{ border-bottom:none; }
+  .skill-name{ flex:1; font-weight:600; font-size:0.95rem; }
+  .skill-msg{ font-family:var(--font-mono); font-size:0.8rem; }
+  .tier-pill{ font-family:var(--font-mono); font-size:0.72rem; font-weight:700; padding:0.3rem 0.7rem; border-radius:20px; color:#fff; white-space:nowrap; }
+  .tier-red{ background:var(--red); }
+  .tier-amber{ background:var(--amber); }
+  .tier-green{ background:var(--green); }
+
+  table{ width:100%; border-collapse:collapse; font-size:0.88rem; }
+  th{ text-align:left; font-family:var(--font-mono); font-size:0.72rem; text-transform:uppercase; opacity:0.55; padding:0.5rem; border-bottom:1px solid var(--line); }
+  td{ padding:0.5rem; border-bottom:1px solid var(--line); }
+  .idle{ opacity:0.45; }
+  .status-dot{ width:9px; height:9px; border-radius:50%; display:inline-block; margin-right:0.4rem; }
+  .status-active .status-dot{ background:var(--green); }
+  .status-idle .status-dot{ background:#bbb; }
+
+  .student-group{ border:1px solid var(--line); border-radius:10px; margin-bottom:0.6rem; overflow:hidden; }
+  .student-summary{ display:flex; justify-content:space-between; align-items:center; padding:0.7rem 1rem; cursor:pointer; background:var(--paper-dim); font-size:0.9rem; }
+  .student-detail{ display:none; padding:0.6rem 1rem; }
+  .student-detail.open{ display:block; }
+  .attempt-row{ display:flex; justify-content:space-between; align-items:center; font-family:var(--font-mono); font-size:0.78rem; padding:0.35rem 0; border-bottom:1px dashed var(--line); }
+  .attempt-row button{ padding:0.2rem 0.5rem; font-size:0.68rem; }
+
+  .modal-backdrop{ display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; z-index:200; }
+  .modal-backdrop.open{ display:flex; }
+  .modal{ background:#fff; border-radius:12px; padding:1.6rem; max-width:380px; width:90%; }
+  .modal input{ margin:0.8rem 0; }
+  .empty-state{ font-family:var(--font-mono); font-size:0.85rem; opacity:0.55; padding:1rem 0; }
+</style>
+</head>
+<body>
+
+<h1>Founder's Day Mystery — Teacher Dashboard</h1>
+<div class="sub">Live class tracker · auto-refreshes every 5 seconds</div>
+
+<div class="panel">
+  <h2>Backend connection</h2>
+  <label>Apps Script Web App URL</label>
+  <div class="row">
+    <input type="text" id="backendUrl" placeholder="https://script.google.com/macros/s/AKfycbyH1VgE4IFPf5lAbebtdlid4zQIpOG0a39uaR-mzVPKky434xJEgDK94LCe1gigv-5DdA/exec">
+    <button class="primary" id="saveBackend">Save</button>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Session</h2>
+  <div class="row" style="align-items:center;">
+    <div>
+      <label>Active session code</label>
+      <div class="session-code-display" id="sessionCodeDisplay">------</div>
+    </div>
+    <button class="primary" id="newSessionBtn">Start New Session</button>
+  </div>
+  <p style="font-family:var(--font-mono); font-size:0.78rem; opacity:0.6; margin-top:0.8rem;">Share this 6-digit code with students — they enter it on the game's start screen. Only attempts logged under this code appear below.</p>
+</div>
+
+<div class="panel">
+  <h2>How Our Class Is Doing</h2>
+  <div id="skillSummary"><div class="empty-state">No data yet — waiting for students to start playing.</div></div>
+</div>
+
+<div class="panel">
+  <h2>Live Class Tracker</h2>
+  <table>
+    <thead><tr><th>Student</th><th>Score</th><th>Attempts logged</th><th>Status</th></tr></thead>
+    <tbody id="liveTrackerBody"><tr><td colspan="4" class="empty-state">No students yet.</td></tr></tbody>
+  </table>
+</div>
+
+<div class="panel">
+  <h2>Manage Log Entries</h2>
+  <div class="row" style="margin-bottom:1rem;">
+    <button class="danger" id="clearSessionBtn">Clear This Session</button>
+  </div>
+  <div id="manageLog"><div class="empty-state">No entries yet.</div></div>
+</div>
+
+<div class="modal-backdrop" id="clearModal">
+  <div class="modal">
+    <h2 style="font-family:var(--font-display); font-size:1.1rem; margin-bottom:0.5rem;">Clear this session?</h2>
+    <p style="font-size:0.88rem;">This deletes every log entry for session <strong id="clearModalSession"></strong> only. Other sessions sharing this backend are untouched. This cannot be undone.</p>
+    <p style="font-size:0.82rem; margin-top:0.6rem;">Type <strong>CLEAR</strong> to confirm:</p>
+    <input type="text" id="clearConfirmInput" placeholder="Type CLEAR">
+    <div class="row">
+      <button class="danger" id="clearConfirmBtn" disabled>Clear Session</button>
+      <button id="clearCancelBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let backendUrl = localStorage.getItem('numseq-teacher-backend') || '';
+  let sessionCode = localStorage.getItem('numseq-teacher-session') || '';
+  let latestData = [];
+  const expandedStudents = new Set();
+
+  document.getElementById('backendUrl').value = backendUrl;
+  document.getElementById('sessionCodeDisplay').textContent = sessionCode || '------';
+
+  document.getElementById('saveBackend').addEventListener('click', ()=>{
+    backendUrl = document.getElementById('backendUrl').value.trim();
+    localStorage.setItem('numseq-teacher-backend', backendUrl);
+    poll();
+  });
+
+  document.getElementById('newSessionBtn').addEventListener('click', ()=>{
+    sessionCode = String(Math.floor(100000 + Math.random()*900000));
+    localStorage.setItem('numseq-teacher-session', sessionCode);
+    document.getElementById('sessionCodeDisplay').textContent = sessionCode;
+    expandedStudents.clear();
+    poll();
+  });
+
+  async function poll(){
+    if(!backendUrl || !sessionCode) return;
+    try{
+      const res = await fetch(backendUrl + '?action=fetch&session=' + encodeURIComponent(sessionCode));
+      const json = await res.json();
+      if(json.ok){ latestData = json.data; render(); }
+    }catch(e){ /* silent — will retry on next poll */ }
+  }
+
+  function groupByStudent(data){
+    const groups = {};
+    data.forEach(row=>{
+      const name = row.studentName || 'Unknown';
+      if(!groups[name]) groups[name] = [];
+      groups[name].push(row);
+    });
+    return groups;
+  }
+
+  const SKILL_ORDER = ['Recognising the Pattern', 'Finding & Simplifying Tn', 'Working Beyond the Sequence', 'Real-World Application & Reasoning'];
+
+  function renderSkillSummary(data){
+    const el = document.getElementById('skillSummary');
+    if(data.length === 0){ el.innerHTML = '<div class="empty-state">No data yet — waiting for students to start playing.</div>'; return; }
+    const bySkill = {};
+    data.forEach(row=>{
+      const skill = row.skill || 'Unknown';
+      if(!bySkill[skill]) bySkill[skill] = {total:0, gap:0, students:new Set()};
+      bySkill[skill].total++;
+      bySkill[skill].students.add(row.studentName);
+      const isGap = row.correct !== 'Correct' || row.attempts === 2 || row.attempts === 'Timed out';
+      if(isGap) bySkill[skill].gap++;
+    });
+    const rows = Object.keys(bySkill).map(skill=>{
+      const s = bySkill[skill];
+      const pct = s.total ? Math.round((s.gap / s.total) * 100) : 0;
+      let tier, msg;
+      if(pct >= 50){ tier='tier-red'; msg="Still getting comfortable with this — let's go through it together as a class!"; }
+      else if(pct >= 20){ tier='tier-amber'; msg='Getting there — a quick group recap could help.'; }
+      else { tier='tier-green'; msg='Looking strong across the class!'; }
+      return {skill, pct, tier, msg};
+    });
+    rows.sort((a,b)=> b.pct - a.pct);
+    el.innerHTML = rows.map(r => `
+      <div class="skill-row">
+        <div class="skill-name">${r.skill}</div>
+        <div class="skill-msg">${r.msg}</div>
+        <div class="tier-pill ${r.tier}">${r.pct}% still practising</div>
+      </div>
+    `).join('');
+  }
+
+  function renderLiveTracker(data){
+    const body = document.getElementById('liveTrackerBody');
+    if(data.length === 0){ body.innerHTML = '<tr><td colspan="4" class="empty-state">No students yet.</td></tr>'; return; }
+    const groups = groupByStudent(data);
+    const now = Date.now();
+    const rowsHtml = Object.keys(groups).sort().map(name=>{
+      const rows = groups[name];
+      const correctCount = rows.filter(r=>r.correct === 'Correct').length;
+      const lastTs = Math.max(...rows.map(r=> new Date(r.timestamp).getTime() || 0));
+      const isActive = (now - lastTs) < 30000;
+      return `<tr class="${isActive?'':'idle'}">
+        <td>${name}</td>
+        <td>${correctCount} / ${rows.length}</td>
+        <td>${rows.length}</td>
+        <td class="${isActive?'status-active':'status-idle'}"><span class="status-dot"></span>${isActive?'Active':'Idle'}</td>
+      </tr>`;
+    }).join('');
+    body.innerHTML = rowsHtml;
+  }
+
+  function renderManageLog(data){
+    const el = document.getElementById('manageLog');
+    if(data.length === 0){ el.innerHTML = '<div class="empty-state">No entries yet.</div>'; return; }
+    const groups = groupByStudent(data);
+    el.innerHTML = Object.keys(groups).sort().map(name=>{
+      const rows = groups[name];
+      const correctCount = rows.filter(r=>r.correct === 'Correct').length;
+      const isOpen = expandedStudents.has(name);
+      const detailRows = rows.map(r => `
+        <div class="attempt-row">
+          <span>${r.round ? 'Clue '+r.round+' · ' : ''}${r.skill || ''} — ${r.correct || ''} (${r.attempts} ${typeof r.attempts === 'number' ? (r.attempts===1?'try':'tries') : ''})</span>
+          <button data-delete-row="${r.rowIndex}">Delete</button>
+        </div>
+      `).join('');
+      return `
+        <div class="student-group">
+          <div class="student-summary" data-toggle="${name}">
+            <span>${name} — ${rows.length} attempts, ${correctCount} correct</span>
+            <span>${isOpen ? '▲' : '▼'}</span>
+          </div>
+          <div class="student-detail ${isOpen?'open':''}" data-detail="${name}">${detailRows}</div>
+        </div>
+      `;
+    }).join('');
+
+    el.querySelectorAll('[data-toggle]').forEach(elm=>{
+      elm.addEventListener('click', ()=>{
+        const name = elm.dataset.toggle;
+        if(expandedStudents.has(name)) expandedStudents.delete(name); else expandedStudents.add(name);
+        renderManageLog(latestData);
+      });
+    });
+    el.querySelectorAll('[data-delete-row]').forEach(btn=>{
+      btn.addEventListener('click', async (e)=>{
+        e.stopPropagation();
+        const rowIndex = btn.dataset.deleteRow;
+        try{ await fetch(backendUrl + '?action=delete&rowIndex=' + rowIndex); }catch(err){}
+        poll();
+      });
+    });
+  }
+
+  function render(){
+    renderSkillSummary(latestData);
+    renderLiveTracker(latestData);
+    renderManageLog(latestData);
+  }
+
+  // Clear-session modal
+  const clearModal = document.getElementById('clearModal');
+  document.getElementById('clearSessionBtn').addEventListener('click', ()=>{
+    document.getElementById('clearModalSession').textContent = sessionCode || '(none)';
+    document.getElementById('clearConfirmInput').value = '';
+    document.getElementById('clearConfirmBtn').disabled = true;
+    clearModal.classList.add('open');
+  });
+  document.getElementById('clearCancelBtn').addEventListener('click', ()=> clearModal.classList.remove('open'));
+  document.getElementById('clearConfirmInput').addEventListener('input', (e)=>{
+    document.getElementById('clearConfirmBtn').disabled = e.target.value !== 'CLEAR';
+  });
+  document.getElementById('clearConfirmBtn').addEventListener('click', async ()=>{
+    try{ await fetch(backendUrl + '?action=clearSession&session=' + encodeURIComponent(sessionCode)); }catch(e){}
+    clearModal.classList.remove('open');
+    poll();
+  });
+
+  setInterval(poll, 5000);
+  poll();
+</script>
+</body>
+</html>
